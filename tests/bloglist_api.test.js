@@ -26,6 +26,12 @@ describe('when there is initially some blogs saved', () => {
 
     expect(response.body).toHaveLength(helper.initialBlogs.length)
   })
+
+  test('unique identifier property of the blog posts is named id', async () => {
+    const response = await api.get('/api/blogs')
+
+    expect(response.body[0].id).toBeDefined()
+  })
 })
 
 afterAll(() => {
