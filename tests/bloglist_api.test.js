@@ -71,6 +71,20 @@ describe('addition of a new blog', () => {
     expect(blogsAtEnd[size].likes).toBeDefined()
     expect(blogsAtEnd[size].likes).toBe(0)
   })
+
+  test('if title and url properties are missing return bad request', async () => {
+    const newBlog = {
+      author: 'Tester',
+      likes: 1
+    }
+    await api.post('/api/blogs')
+      .send(newBlog)
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    expect(blogsAtEnd).toHaveLength(helper.initialBlogs.length)
+  })
 })
 
 afterAll(() => {
