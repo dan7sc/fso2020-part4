@@ -1,9 +1,11 @@
 const supertest = require('supertest')
 const mongoose = require('mongoose')
+const bcrypt = require('bcrypt')
 const helper = require('./test_helper')
 const app = require('../app')
 const api = supertest(app)
 const Blog = require('../models/blog')
+const User = require('../models/user')
 
 beforeEach(async () => {
   await Blog.deleteMany({})
@@ -121,6 +123,108 @@ describe('deletion of a blog', () => {
 
     const titles = blogsAtEnd.map(blog => blog.title)
     expect(titles).not.toContain(blogToDelete.title)
+  })
+})
+
+describe('when there initially one user in db', () => {
+  beforeEach(async () => {
+    await User.deleteMany({})
+
+    const passwordHash = await bcrypt.hash('toorin', 10)
+    const user = new User({
+      username: 'root',
+      name: 'root',
+      passwordHash
+    })
+
+    await user.save()
+  })
+
+  test('creation succeeds with a fresh username', async () => {
+    const usersAtStart = await helper.usersInDb()
+
+    const newUser = {
+      username: 'mluukkai',
+      name: 'Matti Luukkainen',
+      password: 'salainen'
+    }
+    await api
+      .post('/api/users')
+      .send(newUser)
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    const usersAtEnd = await helper.usersInDb()
+    const size = usersAtStart.length
+    expect(usersAtEnd.length).toBe(size + 1)
+    expect(usersAtEnd[size].username).toContain('mluukkai')
+  })
+
+  test('creation fails with a username length < 3 characters', async () => {
+    const usersAtStart = await helper.usersInDb()
+
+    const newUser = {
+      username: 'lu',
+      name: 'Mattios Lukacs',
+      password: 'salainen'
+    }
+
+    const response = await api
+      .post('/api/users')
+      .send(newUser)
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    expect(response.body.error).toContain('username and password must be at least 3 characters long')
+
+    const usersAtEnd = await helper.usersInDb()
+    const size = usersAtStart.length
+    expect(usersAtEnd.length).toBe(size)
+    expect(usersAtEnd[size]).not.toBeDefined()
+  })
+
+  test('creation fails with a password < 3 characters', async () => {
+    const usersAtStart = await helper.usersInDb()
+
+    const newUser = {
+      username: 'luka',
+      name: 'Mattios Lukacs',
+      password: 'sa'
+    }
+    const response = await api
+      .post('/api/users')
+      .send(newUser)
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    expect(response.body.error).toContain('username and password must be at least 3 characters long')
+
+    const usersAtEnd = await helper.usersInDb()
+    const size = usersAtStart.length
+    expect(usersAtEnd.length).toBe(size)
+    expect(usersAtEnd[size]).not.toBeDefined()
+  })
+
+  test('creation fails with username is not unique', async () => {
+    const usersAtStart = await helper.usersInDb()
+
+    const newUser = {
+      username: 'root',
+      name: 'root two',
+      password: 'owttoor'
+    }
+    const response = await api
+      .post('/api/users')
+      .send(newUser)
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    expect(response.body.error).toContain('Error, expected \`username\` to be unique')
+
+    const usersAtEnd = await helper.usersInDb()
+    const size = usersAtStart.length
+    expect(usersAtEnd.length).toBe(size)
+    expect(usersAtEnd[size]).not.toBeDefined()
   })
 })
 
