@@ -34,6 +34,27 @@ describe('when there is initially some blogs saved', () => {
   })
 })
 
+describe('addition of a new blog', () => {
+  test('succeeds with a valid data', async () => {
+    const newBlog = {
+        title: 'Testing post a new blog',
+        author: 'Tester',
+        url: 'http://www.example.com',
+        likes: 0
+    }
+    await api.post('/api/blogs')
+      .send(newBlog)
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    expect(blogsAtEnd).toHaveLength(helper.initialBlogs.length + 1)
+
+    const titles = blogsAtEnd.map(blog => blog.title)
+    expect(titles).toContain('Testing post a new blog')
+  })
+})
+
 afterAll(() => {
   mongoose.connection.close()
 })
