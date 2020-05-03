@@ -12,7 +12,8 @@ const mongoUrl = config.MONGODB_URI
 
 mongoose.connect(mongoUrl, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  useFindAndModify: false
 })
 
 
