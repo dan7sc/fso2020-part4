@@ -53,6 +53,24 @@ describe('addition of a new blog', () => {
     const titles = blogsAtEnd.map(blog => blog.title)
     expect(titles).toContain('Testing post a new blog')
   })
+
+  test('if likes property is missing the default value is zero', async () => {
+    const newBlog = {
+      title: 'Post a new blog without likes property',
+      author: 'Tester',
+      url: 'http://www.example.com'
+    }
+    await api.post('/api/blogs')
+      .send(newBlog)
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    const size = helper.initialBlogs.length
+    expect(blogsAtEnd).toHaveLength(size + 1)
+    expect(blogsAtEnd[size].likes).toBeDefined()
+    expect(blogsAtEnd[size].likes).toBe(0)
+  })
 })
 
 afterAll(() => {
