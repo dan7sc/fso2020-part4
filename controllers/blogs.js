@@ -10,7 +10,7 @@ blogsRouter.get('/', async (request, response) => {
   response.json(blogs.map(blog => blog.toJSON()))
 })
 
-blogsRouter.post('/', async (request, response) => {
+blogsRouter.post('/', async (request, response, next) => {
   const body = request.body
   const token = request.token
 
@@ -23,6 +23,7 @@ blogsRouter.post('/', async (request, response) => {
       name: 'BadRequestError',
       message: 'bad request'
     }
+    return next(error)
   }
 
   const user = await User.findById(decodeToken.id)

@@ -18,7 +18,7 @@ beforeEach(async () => {
 
 describe('when there is initially some blogs saved', () => {
   test('blogs are returned as json', async () => {
-    const response = await api.get('/api/blogs')
+    await api.get('/api/blogs')
       .expect(200)
       .expect('Content-Type', /application\/json/)
   })
@@ -37,14 +37,37 @@ describe('when there is initially some blogs saved', () => {
 })
 
 describe('addition of a new blog', () => {
+  let token
+
+  beforeEach(async () => {
+    await User.deleteMany({})
+
+    const passwordHash = await bcrypt.hash('salainen', 10)
+    const user = new User({
+      username: 'mluukkai',
+      name: 'Matti Luukkainen',
+      passwordHash
+    })
+    await user.save()
+
+    const loggedUser = {
+      username: 'mluukkai',
+      password: 'salainen'
+    }
+    const response = await api.post('/api/login')
+      .send(loggedUser)
+    token = response.body.token
+  })
+
   test('succeeds with a valid data', async () => {
     const newBlog = {
-        title: 'Testing post a new blog',
-        author: 'Tester',
-        url: 'http://www.example.com',
-        likes: 0
+      title: 'Testing post a new blog',
+      author: 'Tester',
+      url: 'http://www.example.com',
+      likes: 0
     }
     await api.post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
@@ -56,6 +79,22 @@ describe('addition of a new blog', () => {
     expect(titles).toContain('Testing post a new blog')
   })
 
+  test('fails if token is not proviced', async () => {
+    const newBlog = {
+      title: 'Testing post a new blog',
+      author: 'Tester',
+      url: 'http://www.example.com',
+      likes: 0
+    }
+    await api.post('/api/blogs')
+      .send(newBlog)
+      .expect(401)
+      .expect('Content-Type', /application\/json/)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    expect(blogsAtEnd).toHaveLength(helper.initialBlogs.length)
+  })
+
   test('if likes property is missing the default value is zero', async () => {
     const newBlog = {
       title: 'Post a new blog without likes property',
@@ -63,6 +102,7 @@ describe('addition of a new blog', () => {
       url: 'http://www.example.com'
     }
     await api.post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
@@ -80,6 +120,7 @@ describe('addition of a new blog', () => {
       likes: 1
     }
     await api.post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(400)
       .expect('Content-Type', /application\/json/)
@@ -109,16 +150,42 @@ describe('update of a blog', () => {
 })
 
 describe('deletion of a blog', () => {
+  let token
+
+  beforeEach(async () => {
+    const loggedUser = {
+      username: 'mluukkai',
+      password: 'salainen'
+    }
+    const response = await api.post('/api/login')
+      .send(loggedUser)
+    token = response.body.token
+
+    const newBlog = {
+      title: 'Testing post a new blog',
+      author: 'Tester',
+      url: 'http://www.example.com',
+      likes: 0
+    }
+
+    await api.post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .send(newBlog)
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+  })
+
   test('succeeds with status code 204 if id is valid', async () => {
     const blogsAtStart = await helper.blogsInDb()
-    const blogToDelete = blogsAtStart[0]
+    const blogToDelete = blogsAtStart[blogsAtStart.length - 1]
 
     await api.delete(`/api/blogs/${blogToDelete.id}`)
+      .set('Authorization', `Bearer ${token}`)
       .expect(204)
 
     const blogsAtEnd = await helper.blogsInDb()
     expect(blogsAtEnd).toHaveLength(
-      helper.initialBlogs.length - 1
+      helper.initialBlogs.length
     )
 
     const titles = blogsAtEnd.map(blog => blog.title)
@@ -219,7 +286,7 @@ describe('when there initially one user in db', () => {
       .expect(400)
       .expect('Content-Type', /application\/json/)
 
-    expect(response.body.error).toContain('Error, expected \`username\` to be unique')
+    expect(response.body.error).toContain('expected `username` to be unique')
 
     const usersAtEnd = await helper.usersInDb()
     const size = usersAtStart.length
