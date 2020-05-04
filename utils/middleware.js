@@ -23,6 +23,18 @@ const errorHandler = (error, request, response, next) => {
   if (error.name === 'JsonWebTokenError') {
     return response.status(400).json({ error: error.message })
   }
+  if (error.name === 'ResourceNotFoundError') {
+    return response.status(404).json({ error: error.message })
+  }
+  if (error.name === 'NotAuthorizedError') {
+    return response.status(401).json({ error: error.message })
+  }
+  if (error.name === 'BadRequesterror') {
+    return response.status(400).json({ error: error.message })
+  }
+  if (error.name === 'TypeError') {
+    return response.status(401).json({ error: error.message })
+  }
   next(error)
 }
 

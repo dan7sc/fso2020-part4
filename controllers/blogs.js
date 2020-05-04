@@ -19,7 +19,10 @@ blogsRouter.post('/', async (request, response) => {
   if (!token || !decodeToken) return next(error)
 
   if (!body.title || !body.url) {
-    return response.status(400).json({ error: 'bad request' })
+    const error = {
+      name: 'BadRequestError',
+      message: 'bad request'
+    }
   }
 
   const user = await User.findById(decodeToken.id)
@@ -57,10 +60,37 @@ blogsRouter.put('/:id', async (request, response) => {
   response.json(updatedBlog)
 })
 
-blogsRouter.delete('/:id', async (request, response) => {
+blogsRouter.delete('/:id', async (request, response, next) => {
   const id = request.params.id
+  const token = request.token
 
-  await Blog.findByIdAndRemove(id)
+  const decodeToken = jwt.verify(token, process.env.SECRET)
+  const userid = decodeToken.id
+
+  if (!token || !decodeToken) return next(error)
+
+  const blog = await Blog.findById(id)
+
+  if (!blog) {
+    const error = {
+      name: 'ResourceNotFoundError',
+      message: 'not found'
+    }
+    return next(error)
+  }
+
+  if (blog.user.toString() !== userid) {
+    const error = {
+      name: 'NotAuthorizedError',
+      message: 'not authorized'
+    }
+    return next(error)
+  }
+
+  const user = await User.findById(blog.user.toString())
+  await User.findByIdAndUpdate(user._id.toString(), { $pull: { blogs: blog._id} })
+
+  await Blog.findByIdAndRemove(blog._id)
   response.status(204).end()
 })
 
