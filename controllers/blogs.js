@@ -2,6 +2,7 @@ const blogsRouter = require('express').Router()
 const jwt = require('jsonwebtoken')
 const Blog = require('../models/blog')
 const User = require('../models/user')
+const Comment = require('../models/comment')
 
 blogsRouter.get('/', async (request, response) => {
   const blogs = await Blog
@@ -16,7 +17,7 @@ blogsRouter.post('/', async (request, response, next) => {
 
   const decodeToken = await jwt.verify(token, process.env.SECRET)
 
-  if (!token || !decodeToken) return next(error)
+  if (!token || !decodeToken) return next()
 
   if (!body.title || !body.url) {
     const error = {
@@ -39,6 +40,11 @@ blogsRouter.post('/', async (request, response, next) => {
   const blog = new Blog(newBlog)
 
   const savedBlog = await blog.save()
+
+  const comments = new Comment(
+    { blog: savedBlog._id.toString(), content: [] }
+  )
+  await comments.save()
 
   user.blogs = user.blogs.concat(savedBlog._id)
   await user.save()
@@ -68,7 +74,7 @@ blogsRouter.delete('/:id', async (request, response, next) => {
   const decodeToken = jwt.verify(token, process.env.SECRET)
   const userid = decodeToken.id
 
-  if (!token || !decodeToken) return next(error)
+  if (!token || !decodeToken) return next()
 
   const blog = await Blog.findById(id)
 
@@ -89,10 +95,47 @@ blogsRouter.delete('/:id', async (request, response, next) => {
   }
 
   const user = await User.findById(blog.user.toString())
-  await User.findByIdAndUpdate(user._id.toString(), { $pull: { blogs: blog._id} })
+  await User.findByIdAndUpdate(
+    user._id.toString(),
+    { $pull: { blogs: blog._id } }
+  )
+
+  await Comment.findOneAndDelete({ blog: blog.id.toString() })
 
   await Blog.findByIdAndRemove(blog._id)
   response.status(204).end()
+})
+
+blogsRouter.get('/:id/comments', async (request, response) => {
+  const id = request.params.id
+
+  const comments = await Comment
+    .findOne({ blog: id.toString() })
+
+  response.json(comments)
+})
+
+blogsRouter.post('/:id/comments', async (request, response, next) => {
+  const id = request.params.id
+  const body = request.body
+
+  if (!body.comment) {
+    const error = {
+      name: 'BadRequestError',
+      message: 'bad request'
+    }
+    return next(error)
+  }
+
+  const blog = await Blog.findById(id)
+
+  const savedComment = await Comment.findOneAndUpdate(
+    { blog: blog._id.toString() },
+    { $push: { content: body.comment } },
+    { new: true, upsert: true }
+  )
+
+  response.status(201).json(savedComment)
 })
 
 module.exports = blogsRouter
